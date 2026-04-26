@@ -224,6 +224,23 @@ export default async function handle(
       throw error;
     }
 
+    // If the link already enforces an allow list, merge the new invitee emails
+    // into it so recipients retain access. We never wipe pre-existing entries
+    // even if the user cleared them from the modal textarea.
+    const existingAllowList = link.allowList ?? [];
+    if (existingAllowList.length > 0) {
+      const mergedAllowList = Array.from(
+        new Set([...existingAllowList, ...validEmails]),
+      );
+
+      if (mergedAllowList.length !== existingAllowList.length) {
+        await prisma.link.update({
+          where: { id: link.id },
+          data: { allowList: mergedAllowList },
+        });
+      }
+    }
+
     const linkUrl = constructLinkUrl(link);
 
     const successes: string[] = [];
