@@ -226,19 +226,31 @@ export default async function handle(
 
     // If the link already enforces an allow list, merge the new invitee emails
     // into it so recipients retain access. We never wipe pre-existing entries
-    // even if the user cleared them from the modal textarea.
-    const existingAllowList = link.allowList ?? [];
-    if (existingAllowList.length > 0) {
-      const mergedAllowList = Array.from(
-        new Set([...existingAllowList, ...validEmails]),
-      );
-
-      if (mergedAllowList.length !== existingAllowList.length) {
-        await prisma.link.update({
+    // even if the user cleared them from the modal textarea. Re-read inside a
+    // transaction so concurrent updates to allowList are not clobbered.
+    if ((link.allowList ?? []).length > 0) {
+      await prisma.$transaction(async (tx) => {
+        const current = await tx.link.findUnique({
           where: { id: link.id },
-          data: { allowList: mergedAllowList },
+          select: { allowList: true },
         });
-      }
+
+        const currentAllowList = current?.allowList ?? [];
+        if (currentAllowList.length === 0) {
+          return;
+        }
+
+        const mergedAllowList = Array.from(
+          new Set([...currentAllowList, ...validEmails]),
+        );
+
+        if (mergedAllowList.length !== currentAllowList.length) {
+          await tx.link.update({
+            where: { id: link.id },
+            data: { allowList: mergedAllowList },
+          });
+        }
+      });
     }
 
     const linkUrl = constructLinkUrl(link);
