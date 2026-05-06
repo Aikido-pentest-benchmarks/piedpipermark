@@ -23,6 +23,15 @@ export const rateLimiters = {
     enableProtection: true,
     analytics: true,
   }),
+
+  // Bulk CSV link import per team
+  bulkLinkImport: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, "1 h"),
+    prefix: "rl:bulk-link-import",
+    enableProtection: true,
+    analytics: true,
+  }),
 };
 
 /**
